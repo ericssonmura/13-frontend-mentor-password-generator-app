@@ -690,8 +690,12 @@ input[type="checkbox"]:focus-visible+label {
   opacity: 1;
 }
 
+.strength-leds .led.animate {
+  animation: led-pop 380ms cubic-bezier(.2,.9,.25,1);
+}
+
 /* LED qui s'éteint */
-.strength-leds .led.turning-off {
+.strength-leds .led.turning-off { /* ------  !PB -------- */
   opacity: 0;
   transform: scale(0.6);
   transition:
@@ -701,10 +705,21 @@ input[type="checkbox"]:focus-visible+label {
     border-color 0.35s ease;
 }
 
+/* .strength-leds .led.turning-off {
+  opacity: 0.4;
+  transition: opacity 0.38s ease;
+} */
+
 .strength-leds .led:nth-child(1) { animation-delay: 0ms; }
 .strength-leds .led:nth-child(2) { animation-delay: 70ms; }
 .strength-leds .led:nth-child(3) { animation-delay: 140ms; }
 .strength-leds .led:nth-child(4) { animation-delay: 210ms; }
+
+/* label color optional */
+.strength-label.too-weak { color: var(--red-500); }
+.strength-label.weak     { color: var(--orange-400); }
+.strength-label.medium   { color: var(--yellow-300); }
+.strength-label.strong   { color: var(--green-200); }
 
 /* level color */
 .strength-leds .led.too-weak.active { background: var(--red-500); border-color: var(--red-500); }
@@ -712,11 +727,7 @@ input[type="checkbox"]:focus-visible+label {
 .strength-leds .led.medium.active   { background: var(--yellow-300); border-color: var(--yellow-300); }
 .strength-leds .led.strong.active   { background: var(--green-200); border-color: var(--green-200); }
 
-/* label color optional */
-.strength-label.too-weak { color: var(--red-500); }
-.strength-label.weak     { color: var(--orange-400); }
-.strength-label.medium   { color: var(--yellow-300); }
-.strength-label.strong   { color: var(--green-200); }
+
 
 
 /* BUTTON GENERATE */
@@ -833,6 +844,13 @@ input[type="checkbox"]:focus-visible+label {
     opacity: 1;
   }
 }
+
+/* @keyframes led-pop { /* #3 
+  0%   { transform: scale(0.4); opacity: 0.4; }
+  80%  { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(1); }
+} */
+
 
 @keyframes led-slide {
   0% {

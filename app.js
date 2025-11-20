@@ -124,29 +124,29 @@
     inputPassword.style.color = password ? 'var(--grey-200)' : 'var(--grey-700)';
   }
 
+
+  /* ============================================
+   PASSWORD STRENGTH SYSTEM — FINAL STRICT VERSION
+   ============================================ */
+
+  /* Charset counter (UI + logic reuse) */
   function countCharsets(password) {
     let count = 0;
-    if (/[A-Z]/.test(password)) count++; // uppercases
-    if (/[a-z]/.test(password)) count++; // lowercases
-    if (/[0-9]/.test(password)) count++; // numbers
-    if (/[^A-Za-z0-9]/.test(password)) count++; // symbols
+    if (/[A-Z]/.test(password)) count++;
+    if (/[a-z]/.test(password)) count++;
+    if (/[0-9]/.test(password)) count++;
+    if (/[^A-Za-z0-9]/.test(password)) count++;
     return count;
   }
 
-  // UPDATE STRENGTH
-
-  /* ---------------------------
-   Professional strength module
-   --------------------------- */
-
-  /* Tiny blacklist (example). Replaced/extended with a real list in prod. */
+  /* Small blacklist */
   const COMMON_PASSWORDS = new Set([
     "123456", "password", "12345678", "qwerty", "abc123", "111111", "123456789",
     "12345", "1234", "password1", "iloveyou", "admin", "letmein", "welcome", "monkey",
     "login", "princess", "qwerty123", "sunshine", "dragon"
   ]);
 
-  /* Estimate charset size more realistically */
+  /* Charset size approx */
   function estimateCharsetSize(password) {
     let size = 0;
     const hasLower = /[a-z]/.test(password);
@@ -157,250 +157,166 @@
     if (hasLower) size += 26;
     if (hasUpper) size += 26;
     if (hasDigits) size += 10;
-    if (hasSymbols) {
-      // we approximate printable symbols set
-      size += 33;
-    }
+    if (hasSymbols) size += 33;
 
-    // Safety: if size 0 (shouldn't happen), return 1 to avoid log2(0)
     return Math.max(1, size);
   }
 
-  /* Raw entropy: L * log2(charsetSize) */
+  /* Raw entropy */
   function rawEntropy(password) {
     const L = password.length;
     const charset = estimateCharsetSize(password);
     return L * Math.log2(charset);
   }
 
-  /* Pattern penalties: returns number of bits to subtract */
+  /* Penalties */
   function patternPenalties(password) {
     if (!password) return 0;
-    let penalty = 0;
-    const lower = password.toLowerCase();
+    let p = 0;
+    const low = password.toLowerCase();
 
-    // repeated characters or long runs (aaa, 1111)
-    if (/(.)\1{2,}/.test(password)) penalty += 12; // repeated triple or more
+    if (/(.)\1{2,}/.test(password)) p += 12;   // aaa, 1111
+    if (/([a-z0-9])(.{0,2})\1\2\1/.test(low)) p += 8; // abababa
+    if (/(abc|abcd|password|123|012|qwerty|asdf|zxc)/.test(low)) p += 18;
+    if (/(qwerty|asdfgh|zxcvbn|1qaz|2wsx)/.test(low)) p += 12;
+    if (/(0123|1234|2345|3456|4567|5678|6789)/.test(low)) p += 12;
 
-    // short repeated groups (ababab)
-    if (/([a-z0-9])(.{0,2})\1\2\1/.test(lower)) penalty += 8;
-
-    // common sequences (abc, 123, qwerty, zxc)
-    const seqRegex = /(abc|abcd|123|012|qwerty|asdf|zxc|password|letmein|iloveyou|admin)/;
-    if (seqRegex.test(lower)) penalty += 18;
-
-    // keyboard sequences common
-    const keyboardSeq = /(qwerty|asdfgh|zxcvbn|1qaz|2wsx)/;
-    if (keyboardSeq.test(lower)) penalty += 12;
-
-    // ascending numeric long sequences
-    if (/(0123|1234|2345|3456|4567|5678|6789)/.test(lower)) penalty += 12;
-
-    return penalty;
+    return p;
   }
 
-  /* Diversity penalty: if only 1 charset used, but long, apply a small penalty */
   function diversityPenalty(password) {
-    let count = 0;
-    if (/[a-z]/.test(password)) count++;
-    if (/[A-Z]/.test(password)) count++;
-    if (/[0-9]/.test(password)) count++;
-    if (/[^A-Za-z0-9]/.test(password)) count++;
-    if (count === 1) return 10;
-    if (count === 2) return 4;
+    const c = countCharsets(password);
+    if (c === 1) return 10;
+    if (c === 2) return 4;
     return 0;
   }
 
-  /* Final entropy estimate = rawEntropy - penalties (min 0) */
+  /* Final entropy */
   function finalEntropy(password) {
-    const raw = rawEntropy(password);
+    const base = rawEntropy(password);
     const penalties = patternPenalties(password) + diversityPenalty(password);
-    const finalE = Math.max(0, raw - penalties);
-    return finalE;
+    return Math.max(0, base - penalties);
   }
 
-  /* NIST-aware check: blacklist, length rules */
+  /* Blacklist and numeric easy cases */
   function isBlacklisted(password) {
-    if (!password) return false;
     return COMMON_PASSWORDS.has(password.toLowerCase());
   }
 
-  /* Main strength calculator returning an object */
+  /* ---------------------------------------------------
+     MAIN ASSESSOR — FINAL STRICT RULES
+     --------------------------------------------------- */
   function assessPassword(password) {
-    const len = password ? password.length : 0;
-    const result = {
+    const res = {
       label: "",
-      level: "too-weak", // too-weak, weak, medium, strong
+      level: "too-weak",
       leds: 1,
-      entropy: 0,
-      reasons: []
+      entropy: 0
     };
 
-    if (!password || len === 0) {
-      result.label = "";
-      result.level = "too-weak";
-      result.leds = 0;
-      result.entropy = 0;
-      return result;
+    if (!password) {
+      res.label = "";
+      res.leds = 0;
+      return res;
     }
 
-    // 1) Blacklist => immediate too weak
-    if (isBlacklisted(password) || /^\d+$/.test(password) && password.length <= 6) {
-      result.label = "TOO WEAK!";
-      result.level = "too-weak";
-      result.leds = 1;
-      result.entropy = finalEntropy(password);
-      result.reasons.push("blacklist or simple number");
-      return result;
-    }
-
-    // 2) For short passwords (< 8) stay conservative
-    if (len < 4) {
-      result.label = "TOO WEAK!";
-      result.level = "too-weak";
-      result.leds = 1;
-      result.entropy = finalEntropy(password);
-      result.reasons.push("too short");
-      return result;
-    }
-
-    if (len >= 4 && len < 8) {
-      // minimal checks: require >=2 charsets to avoid too-weak
-      const charsetCount = countCharsets(password || "");
-      if (len === 4 && charsetCount < 2) {
-        result.label = "TOO WEAK!";
-        result.level = "too-weak";
-        result.leds = 1;
-        result.entropy = finalEntropy(password);
-        result.reasons.push("4 chars with low diversity");
-        return result;
-      }
-      // Otherwise still weak or medium
-      result.entropy = finalEntropy(password);
-      if (result.entropy >= 30) {
-        result.label = "MEDIUM";
-        result.level = "medium";
-        result.leds = 3;
-      } else if (result.entropy >= 20) {
-        result.label = "WEAK";
-        result.level = "weak";
-        result.leds = 2;
-      } else {
-        result.label = "TOO WEAK!";
-        result.level = "too-weak";
-        result.leds = 1;
-      }
-      return result;
-    }
-
-    // 3) For passwords >= 8 and especially >= 10 — use entropy + penalties
+    const len = password.length;
     const entropy = finalEntropy(password);
-    result.entropy = entropy;
+    const csets = countCharsets(password);
+    res.entropy = entropy;
 
-    // Thresholds (configurable)
-    // We treat >=10 specially: require entropy >=60 for strong, else medium/weak
-    if (len >= 10) {
-      if (entropy >= 60) {
-        result.label = "STRONG";
-        result.level = "strong";
-        result.leds = 4;
-      } else if (entropy >= 45) {
-        result.label = "MEDIUM";
-        result.level = "medium";
-        result.leds = 3;
-      } else if (entropy >= 30) {
-        result.label = "WEAK";
-        result.level = "weak";
-        result.leds = 2;
-      } else {
-        result.label = "TOO WEAK!";
-        result.level = "too-weak";
-        result.leds = 1;
-      }
-      return result;
+    /* BLACKLIST */
+    if (isBlacklisted(password) || (/^\d+$/.test(password) && len <= 7)) {
+      res.label = "TOO WEAK!";
+      return res;
     }
 
-    // 8-9 characters: more conservative mapping
-    if (len >= 8 && len <= 9) {
-      if (entropy >= 50) {
-        result.label = "STRONG";
-        result.level = "strong";
-        result.leds = 4;
-      } else if (entropy >= 40) {
-        result.label = "MEDIUM";
-        result.level = "medium";
-        result.leds = 3;
-      } else if (entropy >= 25) {
-        result.label = "WEAK";
-        result.level = "weak";
-        result.leds = 2;
-      } else {
-        result.label = "TOO WEAK!";
-        result.level = "too-weak";
-        result.leds = 1;
-      }
-      return result;
+    /* LENGTH < 8 always TOO WEAK (no regr.) */
+    if (len < 8) {
+      res.label = "TOO WEAK!";
+      return res;
     }
 
-    // Fallback
-    result.label = "TOO WEAK!";
-    result.level = "too-weak";
-    result.leds = 1;
-    return result;
+    /* ===== STRICT RULES WITHOUT REGRESSIONS ===== */
+
+    /* STRONG only: 4 sets + >=12 chars + entropy>=70 */
+    if (csets === 4 && len >= 12 && entropy >= 70) {
+      res.label = "STRONG";
+      res.level = "strong";
+      res.leds = 4;
+      return res;
+    }
+
+    /* MEDIUM only possible >= 10 chars AND entropy >= 45 */
+    if (len >= 10 && entropy >= 45) {
+      res.label = "MEDIUM";
+      res.level = "medium";
+      res.leds = 3;
+      return res;
+    }
+
+    /* WEAK only possible >= 8 chars AND entropy >= 30 */
+    if (len >= 8 && entropy >= 30) {
+      res.label = "WEAK";
+      res.level = "weak";
+      res.leds = 2;
+      return res;
+    }
+
+    /* OTHERWISE → still too weak */
+    res.label = "TOO WEAK!";
+    res.level = "too-weak";
+    res.leds = 1;
+    return res;
   }
 
-  /* ---------- UI binding ---------- */
+
+  /* ---------------------------------------------------
+     UI UPDATE (keeps your LED animations working)
+     --------------------------------------------------- */
   function updateStrengthUI(password) {
     const leds = document.querySelectorAll(".strength-leds .led");
     const labelEl = document.querySelector(".strength-label");
+
     if (!leds.length || !labelEl) return;
 
-    // reset classes
-    leds.forEach(led => {
-      led.classList.remove("active", "too-weak", "weak", "medium", "strong", "turning-off");
-    });
+    // Reset global classes
     labelEl.classList.remove("too-weak", "weak", "medium", "strong");
 
-    if (!password || password.length === 0) {
+    leds.forEach(led => {
+      led.classList.remove("active", "too-weak", "weak", "medium", "strong", "turning-off", "animate");
+    });
+
+    if (!password) {
       labelEl.textContent = "";
       return;
     }
 
-    const assessment = assessPassword(password);
+    const result = assessPassword(password);
+    labelEl.textContent = result.label;
+    labelEl.classList.add(result.level);
 
-    // animate turning-off for previously active leds (gentle)
-    leds.forEach((led, i) => {
-      if (led.classList.contains("active") && i >= assessment.leds) {
-        led.classList.add("turning-off");
-        setTimeout(() => led.classList.remove("turning-off"), 360);
-      }
-    });
+    // Light LEDs with animation
+    for (let i = 0; i < result.leds; i++) {
+      const led = leds[i];
+      if (!led) continue;
 
-    // activate leds and color classes
-    for (let i = 0; i < assessment.leds && i < leds.length; i++) {
-      leds[i].classList.add("active", assessment.level);
+      // restart animation
+      led.classList.remove("animate");
+      void led.offsetWidth;
+
+      led.classList.add("active", result.level, "animate");
     }
 
-    labelEl.textContent = assessment.label;
-    labelEl.classList.add(assessment.level);
+    // Turning off LEDs above the new count
+    for (let i = result.leds; i < leds.length; i++) {
+      const led = leds[i];
+      if (!led.classList.contains("active")) continue;
 
-    // debug: expose entropy on data-attribute if needed
-    labelEl.dataset.entropy = Math.round(assessment.entropy);
+      led.classList.add("turning-off");
+      setTimeout(() => led.classList.remove("turning-off", "active", "too-weak", "weak", "medium", "strong"), 380);
+    }
   }
-
-  /* Helper: reuse existing countCharsets if present; fallback here */
-  function countCharsets(password) {
-    let count = 0;
-    if (/[A-Z]/.test(password)) count++;
-    if (/[a-z]/.test(password)) count++;
-    if (/[0-9]/.test(password)) count++;
-    if (/[^A-Za-z0-9]/.test(password)) count++;
-    return count;
-  }
-
-  /* ---------------------------
-     End of module
-     --------------------------- */
 
 
   // Generate button click
