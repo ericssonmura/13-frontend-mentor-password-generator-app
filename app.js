@@ -272,7 +272,7 @@
 
 
   /* ---------------------------------------------------
-     UI UPDATE (keeps your LED animations working)
+     UPDATE STRENGTH  
      --------------------------------------------------- */
   function updateStrengthUI(password) {
     const leds = document.querySelectorAll(".strength-leds .led");
@@ -317,7 +317,6 @@
       setTimeout(() => led.classList.remove("turning-off", "active", "too-weak", "weak", "medium", "strong"), 380);
     }
   }
-
 
   // Generate button click
   function onGenerate(e) {
