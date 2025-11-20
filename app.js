@@ -126,7 +126,7 @@
 
 
   /* ============================================
-   PASSWORD STRENGTH SYSTEM — FINAL STRICT VERSION
+   PASSWORD STRENGTH SYSTEM — STRICT VERSION
    ============================================ */
 
   /* Charset counter (UI + logic reuse) */

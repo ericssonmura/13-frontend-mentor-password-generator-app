@@ -259,7 +259,7 @@ legend {
   flex-direction: column;
   justify-content: center;
   inline-size: 100%;
-  max-inline-size: 33rem;
+  max-inline-size: 21.375rem; /* MOBILE DEFAULT */
 }
 
 .app-header {
@@ -880,18 +880,15 @@ input[type="checkbox"]:focus-visible+label {
 
 
 
-
-@media (width >=48em) {
+@media (width >= 48em) {
   .main-wrapper {
     padding-block: 0;
-    /* margin-block-start: 132px; */
     justify-content: center;
   }
 
   .pg-wrapper {
     margin-block-start: var(--spacing-32);
-    /* width: 100%; */
-    max-inline-size: 40rem;
+    max-inline-size: 33.75rem;
   }
 
   section {
