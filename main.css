@@ -678,9 +678,27 @@ input[type="checkbox"]:focus-visible+label {
 }
 
 .strength-leds .led.active {
-  animation: led-pop 0.4s ease-out; /* 0.25s
+  /* animation: led-pop 0.4s ease-out; /* 0.25s */
+  animation: led-pop 380ms cubic-bezier(.2,.9,.25,1);
   /* animation: led-slide 0.28s ease-out; */
   /* animation: led-pulse 0.6s cubic-bezier(.25,.65,.35,1); */
+}
+
+/* LED qui s'allume (déjà active dans ton code) */
+.strength-leds .led.active {
+  transform: scale(1);
+  opacity: 1;
+}
+
+/* LED qui s'éteint */
+.strength-leds .led.turning-off {
+  opacity: 0;
+  transform: scale(0.6);
+  transition:
+    opacity 0.35s ease,
+    transform 0.35s ease,
+    background-color 0.35s ease,
+    border-color 0.35s ease;
 }
 
 .strength-leds .led:nth-child(1) { animation-delay: 0ms; }
@@ -761,7 +779,7 @@ input[type="checkbox"]:focus-visible+label {
 }
 
 
-/* Shake animation */
+/* Shake */
 @keyframes shake {
   10%,
   90% {
@@ -785,8 +803,9 @@ input[type="checkbox"]:focus-visible+label {
   }
 }
 
-/* Animation scale-in */
-@keyframes led-pop {
+/* Scale-in */
+
+/* @keyframes led-pop {
   0% {
     transform: scale(0.4);
     opacity: 0;
@@ -797,6 +816,21 @@ input[type="checkbox"]:focus-visible+label {
   }
   100% {
     transform: scale(1);
+  }
+} */
+
+@keyframes led-pop { /* #2 */
+  0% {
+    transform: scale(0.9);
+    opacity: 0.6;
+  }
+  70% {
+    transform: scale(1.12);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
   }
 }
 

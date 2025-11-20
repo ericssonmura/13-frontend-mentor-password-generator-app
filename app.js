@@ -134,26 +134,33 @@
   }
 
   // UPDATE STRENGTH
+
   function updateStrengthUI(password) {
-    const leds = document.querySelectorAll(".strength-leds .led");
+    const leds = Array.from(document.querySelectorAll(".strength-leds .led"));
     const labelEl = document.querySelector(".strength-label");
     if (!leds.length || !labelEl) return;
 
-    // Reset classes
-    leds.forEach(led => {
-      led.classList.remove("active", "too-weak", "weak", "medium", "strong");
+    // retire toutes les classes de niveau/active (pré-propre)
+    const levelClasses = ["too-weak", "weak", "medium", "strong"];
+    leds.forEach(l => {
+      l.classList.remove("active", ...levelClasses);
+      l.classList.remove("turning-off");
     });
-    labelEl.classList.remove("too-weak", "weak", "medium", "strong");
+    labelEl.classList.remove(...levelClasses);
 
+    // si pas de password -> on vide
     if (!password || password.length === 0) {
       labelEl.textContent = "";
       return;
     }
 
-    const len = password.length;
-    const charsets = countCharsets(password);
+    const charsets = (typeof countCharsets === "function") ? countCharsets(password) : (
+      (/[A-Z]/.test(password) | 0) + (/[a-z]/.test(password) | 0) + (/[0-9]/.test(password) | 0) + (/[^A-Za-z0-9]/.test(password) | 0)
+    );
 
-    
+    const len = password.length;
+
+    // ----- Règles (strictes, stables) -----
     let level = "too-weak";
 
     if (len <= 3) {
@@ -161,27 +168,24 @@
     } else if (len === 4) {
       level = (charsets >= 2) ? "weak" : "too-weak";
     } else if (len >= 5 && len <= 7) {
-      if (charsets <= 2) level = "weak";
-      else if (charsets === 3) level = "weak";
-      else level = "medium"; 
+      // 5-7 -> weak sauf si très dense (conservatif)
+      level = (charsets >= 3 && len >= 7) ? "weak" : "weak";
     } else if (len >= 8 && len <= 10) {
       if (charsets <= 1) level = "weak";
       else if (charsets === 2) level = "medium";
-      else if (charsets === 3) level = "medium";
-      else level = "strong"; 
-    } else {
-      if (charsets <= 2) level = "medium";
+      else if (charsets >= 3) level = "strong";
+    } else { // >= 11
+      if (charsets <= 1) level = "medium";
       else level = "strong";
     }
 
-    // --- Mapping label & LEDs ---
+    // mapping texte + nb leds
     const levelToLabel = {
       "too-weak": "TOO WEAK!",
       "weak": "WEAK",
       "medium": "MEDIUM",
       "strong": "STRONG"
     };
-
     const levelToLeds = {
       "too-weak": 1,
       "weak": 2,
@@ -191,13 +195,44 @@
 
     const ledsToActivate = levelToLeds[level] || 1;
 
-    for (let i = 0; i < ledsToActivate && i < leds.length; i++) {
-      leds[i].classList.add("active", level);
-    }
+    // on décide d'abord quels indices doivent être ON
+    const shouldBeActive = leds.map((_, i) => i < ledsToActivate);
 
+    // on éteint proprement les LEDs qui doivent s'éteindre (anim)
+    leds.forEach((led, i) => {
+      if (!shouldBeActive[i] && led.classList.contains("active")) {
+        // animation d'extinction
+        led.classList.add("turning-off");
+        // retire l'état active après la transition (sûrement synchro avec CSS)
+        setTimeout(() => {
+          led.classList.remove("active", ...levelClasses);
+          led.classList.remove("turning-off");
+        }, 350); // doit correspondre à .turning-off transition-duration
+      }
+    });
+
+    // puis allume les LEDs nécessaires — ajoute `level` et `active` ensemble
+    // on utilise requestAnimationFrame pour garantir que le navigateur applique le style précédent
+    requestAnimationFrame(() => {
+      for (let i = 0; i < leds.length; i++) {
+        const led = leds[i];
+        if (shouldBeActive[i]) {
+          // assure qu'on retire tout turning-off résiduel
+          led.classList.remove("turning-off");
+          // ajoute la classe de niveau (ex: "weak","medium"...)
+          led.classList.add(level);
+          // force un repaint puis active (pour déclencher les transitions/animations)
+          // en pratique requestAnimationFrame suffit pour séparer les opérations
+          led.classList.add("active");
+        }
+      }
+    });
+
+    // texte + couleur label
     labelEl.textContent = levelToLabel[level] || "";
     labelEl.classList.add(level);
   }
+
 
   function calculatePasswordScore(pwd) {
     let score = 0;
