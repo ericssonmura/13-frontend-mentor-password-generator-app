@@ -207,69 +207,83 @@
      MAIN ASSESSOR — FINAL STRICT RULES
      --------------------------------------------------- */
   function assessPassword(password) {
-    const res = {
-      label: "",
-      level: "too-weak",
-      leds: 1,
-      entropy: 0
+    const L = password.length;
+
+    // Character sets detected
+    const sets = {
+      lower: /[a-z]/.test(password),
+      upper: /[A-Z]/.test(password),
+      digit: /[0-9]/.test(password),
+      symbol: /[^A-Za-z0-9]/.test(password)
     };
 
-    if (!password) {
-      res.label = "";
-      res.leds = 0;
-      return res;
+    const charsetSize =
+      (sets.lower ? 26 : 0) +
+      (sets.upper ? 26 : 0) +
+      (sets.digit ? 10 : 0) +
+      (sets.symbol ? 33 : 0);
+
+    const typeCount =
+      (sets.lower ? 1 : 0) +
+      (sets.upper ? 1 : 0) +
+      (sets.digit ? 1 : 0) +
+      (sets.symbol ? 1 : 0);
+
+    // Estimate entropy (classic Shannon log2(charset^L))
+    const entropy = charsetSize > 0 ? Math.floor(L * Math.log2(charsetSize)) : 0;
+
+    // ============================
+    //    NIST-STRICT CLASSIFIER
+    // ============================
+
+    // TOO WEAK (anything < 8 chars)
+    if (L < 8 || typeCount === 0) {
+      return {
+        level: "too-weak",
+        label: "TOO WEAK!",
+        leds: 1,
+        entropy
+      };
     }
 
-    const len = password.length;
-    const entropy = finalEntropy(password);
-    const csets = countCharsets(password);
-    res.entropy = entropy;
-
-    /* BLACKLIST */
-    if (isBlacklisted(password) || (/^\d+$/.test(password) && len <= 7)) {
-      res.label = "TOO WEAK!";
-      return res;
+    // WEAK: small charset or insufficient complexity
+    if (typeCount === 1 || L < 10 || entropy < 30) {
+      return {
+        level: "weak",
+        label: "WEAK",
+        leds: 2,
+        entropy
+      };
     }
 
-    /* LENGTH < 8 always TOO WEAK (no regr.) */
-    if (len < 8) {
-      res.label = "TOO WEAK!";
-      return res;
+    // MEDIUM: moderate complexity
+    if (typeCount >= 2 && L >= 10 && entropy >= 30 && entropy < 70) {
+      return {
+        level: "medium",
+        label: "MEDIUM",
+        leds: 3,
+        entropy
+      };
     }
 
-    /* ===== STRICT RULES WITHOUT REGRESSIONS ===== */
-
-    /* STRONG only: 4 sets + >=12 chars + entropy>=70 */
-    if (csets === 4 && len >= 12 && entropy >= 70) {
-      res.label = "STRONG";
-      res.level = "strong";
-      res.leds = 4;
-      return res;
+    // STRONG: NIST-like strong password
+    if (typeCount === 4 && L >= 12 && entropy >= 70) {
+      return {
+        level: "strong",
+        label: "STRONG",
+        leds: 4,
+        entropy
+      };
     }
 
-    /* MEDIUM only possible >= 10 chars AND entropy >= 45 */
-    if (len >= 10 && entropy >= 45) {
-      res.label = "MEDIUM";
-      res.level = "medium";
-      res.leds = 3;
-      return res;
-    }
-
-    /* WEAK only possible >= 8 chars AND entropy >= 30 */
-    if (len >= 8 && entropy >= 30) {
-      res.label = "WEAK";
-      res.level = "weak";
-      res.leds = 2;
-      return res;
-    }
-
-    /* OTHERWISE → still too weak */
-    res.label = "TOO WEAK!";
-    res.level = "too-weak";
-    res.leds = 1;
-    return res;
+    // Default fallback (rare)
+    return {
+      level: "medium",
+      label: "MEDIUM",
+      leds: 3,
+      entropy
+    };
   }
-
 
   /* ---------------------------------------------------
      UPDATE STRENGTH  
